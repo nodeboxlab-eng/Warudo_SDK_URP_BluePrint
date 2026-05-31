@@ -31,7 +31,7 @@ using Warudo.Core.Plugins;
         typeof(SaveMainCameraOrbitNode68),
         typeof(SetFrontCameraOrbitNode68),
         typeof(DonationQueueNode68),
-        typeof(DonationQueueIntervalByCountNode68),
+        typeof(DonationQueueIntervalTableNode68),
         typeof(SoundPlayNode68),
         // typeof(ThrowPropNode68), // Held/ — NODE68_INCLUDE_THROW_PROP 시 복구
     }
@@ -64,7 +64,7 @@ public sealed class Node68CustomNodesPlugin : Plugin
         typeof(SaveMainCameraOrbitNode68),
         typeof(SetFrontCameraOrbitNode68),
         typeof(DonationQueueNode68),
-        typeof(DonationQueueIntervalByCountNode68),
+        typeof(DonationQueueIntervalTableNode68),
         typeof(SoundPlayNode68),
     };
 
