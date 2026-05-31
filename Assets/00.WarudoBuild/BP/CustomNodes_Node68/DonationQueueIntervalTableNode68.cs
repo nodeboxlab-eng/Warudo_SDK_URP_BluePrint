@@ -29,15 +29,19 @@ namespace Node68.CustomNodes
 
         [DataInput]
         [Label("Cases")]
-        public string CaseInput = "80,100,75,111";
-
-        [DataInput]
-        [Hidden]
+        [Description("큐 간격을 따로 지정할 후원량 목록입니다.")]
         public int[] Cases = { 80, 100, 75, 111 };
 
         [DataInput]
         [Label("기본 출력")]
+        [Description("슬롯에 없는 후원량일 때 출력할 큐 간격입니다.")]
+        [FloatSlider(0f, 60f)]
         public float DefaultOutput = 1f;
+
+        [DataInput]
+        [Label("Info")]
+        [Markdown(primary: true)]
+        public string Info;
 
         protected override void OnCreate()
         {
@@ -50,7 +54,6 @@ namespace Node68.CustomNodes
         public override void OnAllNodesDeserialized(SerializedNode serialized)
         {
             base.OnAllNodesDeserialized(serialized);
-            MigrateLegacyCases(serialized);
             ApplyDisplayName();
             SetupIntervalPorts();
             RestoreIntervalPortValues(serialized);
@@ -81,6 +84,7 @@ namespace Node68.CustomNodes
 
         [DataOutput]
         [Label("출력")]
+        [Description("슬롯에 있는 후원량이면 해당 초, 없으면 기본 출력을 보냅니다.")]
         public float Output() => TryFindInterval(Count, out var seconds) ? seconds : DefaultOutput;
 
         private int ComputeDisplayRevision()
@@ -112,21 +116,6 @@ namespace Node68.CustomNodes
             }
 
             return false;
-        }
-
-        private void MigrateLegacyCases(SerializedNode serialized)
-        {
-            if (serialized?.dataInputs == null)
-                return;
-
-            if (!serialized.dataInputs.ContainsKey(nameof(Cases))
-                || serialized.dataInputs.ContainsKey(nameof(CaseInput))
-                || Cases == null
-                || Cases.Length == 0)
-                return;
-
-            CaseInput = string.Join(",", Cases.Where(amount => amount > 0).Distinct());
-            SetDataInput(nameof(CaseInput), CaseInput, broadcast: true);
         }
 
         private void SetupIntervalPorts()
@@ -165,7 +154,14 @@ namespace Node68.CustomNodes
                     new DataInputProperties
                     {
                         label = $"{amount} 큐 간격",
+                        description = $"{amount} 후원량일 때 Donation Queue Node68에 보낼 큐 간격입니다.",
                         order = 2000f + amount,
+                        typeProperties = new FloatDataInputTypeProperties
+                        {
+                            min = 0f,
+                            max = 60f,
+                            step = 0.1f,
+                        },
                     }
                 );
                 changed = true;
@@ -193,18 +189,8 @@ namespace Node68.CustomNodes
             }
         }
 
-        private IEnumerable<int> GetNormalizedCases()
-        {
-            var source = string.IsNullOrWhiteSpace(CaseInput)
-                ? string.Join(",", Cases ?? Array.Empty<int>())
-                : CaseInput;
-
-            return source
-                .Split(new[] { ',', ' ', '\n', '\r', '\t', ';', '|' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(token => int.TryParse(token.Trim(), out var amount) ? amount : 0)
-                .Where(amount => amount > 0)
-                .Distinct();
-        }
+        private IEnumerable<int> GetNormalizedCases() =>
+            (Cases ?? Array.Empty<int>()).Where(amount => amount > 0).Distinct();
 
         private float GetIntervalForCase(int amount)
         {
@@ -227,6 +213,14 @@ namespace Node68.CustomNodes
 
         private void RefreshDisplay()
         {
+            var matched = TryFindInterval(Count, out var seconds);
+            var output = matched ? seconds : DefaultOutput;
+            var status = matched ? "슬롯 일치" : "기본 출력";
+
+            Info =
+                $"### 큐 간격 슬롯 <br> 비교 개수: {Count} <br> 상태: {status} <br> 출력: {output:0.##}초";
+
+            SetDataInput(nameof(Info), Info, broadcast: true);
             _displayRevision = ComputeDisplayRevision();
             Broadcast();
         }
