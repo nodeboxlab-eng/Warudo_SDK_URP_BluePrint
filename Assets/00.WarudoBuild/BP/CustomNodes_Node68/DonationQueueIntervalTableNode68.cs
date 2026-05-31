@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Warudo.Core.Attributes;
+using Warudo.Core.Data;
 using Warudo.Core.Graphs;
 using Warudo.Core.Serializations;
 
@@ -25,76 +28,9 @@ namespace Node68.CustomNodes
         public int Count;
 
         [DataInput]
-        [Label("1번 후원량")]
-        public int Amount1 = 80;
-
-        [DataInput]
-        [Label("1번 큐 간격")]
-        [FloatSlider(0f, 60f)]
-        public float Interval1 = 3f;
-
-        [DataInput]
-        [Label("2번 후원량")]
-        public int Amount2 = 100;
-
-        [DataInput]
-        [Label("2번 큐 간격")]
-        [FloatSlider(0f, 60f)]
-        public float Interval2 = 6f;
-
-        [DataInput]
-        [Label("3번 후원량")]
-        public int Amount3 = 75;
-
-        [DataInput]
-        [Label("3번 큐 간격")]
-        [FloatSlider(0f, 60f)]
-        public float Interval3 = 8.5f;
-
-        [DataInput]
-        [Label("4번 후원량")]
-        public int Amount4 = 111;
-
-        [DataInput]
-        [Label("4번 큐 간격")]
-        [FloatSlider(0f, 60f)]
-        public float Interval4 = 1f;
-
-        [DataInput]
-        [Label("5번 후원량")]
-        public int Amount5;
-
-        [DataInput]
-        [Label("5번 큐 간격")]
-        [FloatSlider(0f, 60f)]
-        public float Interval5 = 1f;
-
-        [DataInput]
-        [Label("6번 후원량")]
-        public int Amount6;
-
-        [DataInput]
-        [Label("6번 큐 간격")]
-        [FloatSlider(0f, 60f)]
-        public float Interval6 = 1f;
-
-        [DataInput]
-        [Label("7번 후원량")]
-        public int Amount7;
-
-        [DataInput]
-        [Label("7번 큐 간격")]
-        [FloatSlider(0f, 60f)]
-        public float Interval7 = 1f;
-
-        [DataInput]
-        [Label("8번 후원량")]
-        public int Amount8;
-
-        [DataInput]
-        [Label("8번 큐 간격")]
-        [FloatSlider(0f, 60f)]
-        public float Interval8 = 1f;
+        [Label("Cases")]
+        [Description("큐 간격을 따로 지정할 후원량 목록입니다.")]
+        public int[] Cases = { 80, 100, 75, 111 };
 
         [DataInput]
         [Label("기본 출력")]
@@ -111,6 +47,7 @@ namespace Node68.CustomNodes
         {
             base.OnCreate();
             ApplyDisplayName();
+            SetupIntervalPorts();
             RefreshDisplay();
         }
 
@@ -118,12 +55,16 @@ namespace Node68.CustomNodes
         {
             base.OnAllNodesDeserialized(serialized);
             ApplyDisplayName();
+            SetupIntervalPorts();
+            RestoreIntervalPortValues(serialized);
             RefreshDisplay();
         }
 
         public override void OnUpdate()
         {
             base.OnUpdate();
+
+            SetupIntervalPorts();
 
             var revision = ComputeDisplayRevision();
             if (revision == _displayRevision)
@@ -152,22 +93,11 @@ namespace Node68.CustomNodes
             {
                 var hash = Count;
                 hash = (hash * 31) + MathfRoundToInt(DefaultOutput * 100f);
-                hash = (hash * 31) + Amount1;
-                hash = (hash * 31) + MathfRoundToInt(Interval1 * 100f);
-                hash = (hash * 31) + Amount2;
-                hash = (hash * 31) + MathfRoundToInt(Interval2 * 100f);
-                hash = (hash * 31) + Amount3;
-                hash = (hash * 31) + MathfRoundToInt(Interval3 * 100f);
-                hash = (hash * 31) + Amount4;
-                hash = (hash * 31) + MathfRoundToInt(Interval4 * 100f);
-                hash = (hash * 31) + Amount5;
-                hash = (hash * 31) + MathfRoundToInt(Interval5 * 100f);
-                hash = (hash * 31) + Amount6;
-                hash = (hash * 31) + MathfRoundToInt(Interval6 * 100f);
-                hash = (hash * 31) + Amount7;
-                hash = (hash * 31) + MathfRoundToInt(Interval7 * 100f);
-                hash = (hash * 31) + Amount8;
-                hash = (hash * 31) + MathfRoundToInt(Interval8 * 100f);
+                foreach (var amount in GetNormalizedCases())
+                {
+                    hash = (hash * 31) + amount;
+                    hash = (hash * 31) + MathfRoundToInt(GetIntervalForCase(amount) * 100f);
+                }
                 return hash;
             }
         }
@@ -176,25 +106,110 @@ namespace Node68.CustomNodes
         {
             seconds = 0f;
 
-            return TryMatch(count, Amount1, Interval1, out seconds)
-                || TryMatch(count, Amount2, Interval2, out seconds)
-                || TryMatch(count, Amount3, Interval3, out seconds)
-                || TryMatch(count, Amount4, Interval4, out seconds)
-                || TryMatch(count, Amount5, Interval5, out seconds)
-                || TryMatch(count, Amount6, Interval6, out seconds)
-                || TryMatch(count, Amount7, Interval7, out seconds)
-                || TryMatch(count, Amount8, Interval8, out seconds);
+            foreach (var amount in GetNormalizedCases())
+            {
+                if (count != amount)
+                    continue;
+
+                seconds = GetIntervalForCase(amount);
+                return true;
+            }
+
+            return false;
         }
 
-        private static bool TryMatch(int count, int amount, float interval, out float seconds)
+        private void SetupIntervalPorts()
         {
-            seconds = 0f;
-            if (amount <= 0 || count != amount)
-                return false;
+            var changed = false;
+            var desiredKeys = new HashSet<string>(
+                GetNormalizedCases().Select(GetIntervalPortKey),
+                StringComparer.Ordinal
+            );
 
-            seconds = Math.Max(0f, interval);
-            return true;
+            var existingKeys = DataInputPortCollection
+                .GetPorts()
+                .Keys
+                .Where(key => key.StartsWith(IntervalPortPrefix, StringComparison.Ordinal))
+                .ToArray();
+
+            foreach (var key in existingKeys)
+            {
+                if (!desiredKeys.Contains(key))
+                {
+                    DataInputPortCollection.RemovePort(key);
+                    changed = true;
+                }
+            }
+
+            foreach (var amount in GetNormalizedCases())
+            {
+                var key = GetIntervalPortKey(amount);
+                if (DataInputPortCollection.ContainsPort(key))
+                    continue;
+
+                AddDataInputPort(
+                    key,
+                    typeof(float),
+                    GetDefaultInterval(amount),
+                    new DataInputProperties
+                    {
+                        label = $"{amount} 큐 간격",
+                        description = $"{amount} 후원량일 때 Donation Queue Node68에 보낼 큐 간격입니다.",
+                        order = 2000f + amount,
+                        typeProperties = new FloatDataInputTypeProperties
+                        {
+                            min = 0f,
+                            max = 60f,
+                            step = 0.1f,
+                        },
+                    }
+                );
+                changed = true;
+            }
+
+            if (changed)
+                Broadcast();
         }
+
+        private void RestoreIntervalPortValues(SerializedNode serialized)
+        {
+            if (serialized?.dataInputs == null)
+                return;
+
+            foreach (var (key, serializedPort) in serialized.dataInputs)
+            {
+                if (!key.StartsWith(IntervalPortPrefix, StringComparison.Ordinal))
+                    continue;
+
+                var port = DataInputPortCollection.GetPort(key);
+                if (port == null)
+                    continue;
+
+                port.SetSerializedValue(serializedPort.value, Graph.Scene, this);
+            }
+        }
+
+        private IEnumerable<int> GetNormalizedCases() =>
+            (Cases ?? Array.Empty<int>()).Where(amount => amount > 0).Distinct();
+
+        private float GetIntervalForCase(int amount)
+        {
+            var port = DataInputPortCollection.GetPort(GetIntervalPortKey(amount));
+            if (port?.Getter() is float value)
+                return Math.Max(0f, value);
+
+            return GetDefaultInterval(amount);
+        }
+
+        private static float GetDefaultInterval(int amount) =>
+            amount switch
+            {
+                75 => 8.5f,
+                80 => 3f,
+                100 => 6f,
+                111 => 1f,
+                _ => 1f,
+            };
 
         private void RefreshDisplay()
         {
@@ -211,5 +226,9 @@ namespace Node68.CustomNodes
         }
 
         private static int MathfRoundToInt(float value) => (int)Math.Round(value);
+
+        private const string IntervalPortPrefix = "Interval_";
+
+        private static string GetIntervalPortKey(int amount) => IntervalPortPrefix + amount;
     }
 }
