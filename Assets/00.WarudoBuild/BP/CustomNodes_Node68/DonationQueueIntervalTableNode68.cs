@@ -87,6 +87,11 @@ namespace Node68.CustomNodes
         [Description("슬롯에 있는 후원량이면 해당 초, 없으면 기본 출력을 보냅니다.")]
         public float Output() => TryFindInterval(Count, out var seconds) ? seconds : DefaultOutput;
 
+        [DataOutput]
+        [Label("Integer[]")]
+        [Description("Cases 목록을 Integer 배열로 내보냅니다.")]
+        public int[] CasesOutput() => GetNormalizedCases().ToArray();
+
         private int ComputeDisplayRevision()
         {
             unchecked
