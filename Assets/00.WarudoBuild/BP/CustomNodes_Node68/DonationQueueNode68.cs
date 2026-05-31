@@ -12,7 +12,7 @@ namespace Node68.CustomNodes
 {
     /// <summary>
     /// Warudo 「스트리머 후원 메시지 큐」와 동일 동작.
-    /// 유휴 상태에서 첫 Enter 는 즉시 처리(Exit), 이후 True 항목끼리는 저장된 간격마다 Exit.
+    /// 유휴 상태에서 첫 Enter 는 즉시 처리(Exit), 빠른 항목은 큐에 넣지 않고 즉시 Exit.
     /// </summary>
     [NodeType(
         Id = "d7f0b8a2-6d3f-4f4c-9b7e-1a2b3c4d5e01",
@@ -202,17 +202,24 @@ namespace Node68.CustomNodes
 
         private void EnqueueInternal()
         {
+            var item = new QueueItem
+            {
+                Amount = Amount,
+                NickName = NickName ?? "",
+                Message = Msg ?? "",
+                FlowInterval = GetFlowIntervalSeconds(),
+            };
+
+            if (IsFastQueueItem(item))
+            {
+                InvokeImmediate(item);
+                RefreshDisplay();
+                return;
+            }
+
             var wasIdle = !_paused && _current == null && _queue.Count == 0 && _processorCts == null;
 
-            _queue.Add(
-                new QueueItem
-                {
-                    Amount = Amount,
-                    NickName = NickName ?? "",
-                    Message = Msg ?? "",
-                    FlowInterval = GetFlowIntervalSeconds(),
-                }
-            );
+            _queue.Add(item);
 
             if (!_paused)
             {
@@ -225,6 +232,17 @@ namespace Node68.CustomNodes
             }
 
             RefreshDisplay();
+        }
+
+        private void InvokeImmediate(QueueItem item)
+        {
+            var previous = _current;
+            _current = item;
+
+            RefreshDisplay();
+            InvokeFlow(nameof(Exit));
+
+            _current = previous;
         }
 
         private void EnsureProcessorRunning()
@@ -258,9 +276,8 @@ namespace Node68.CustomNodes
                     if (_current == null && _queue.Count == 0)
                         return;
 
-                    // 빠른 항목은 앞의 느린 대기열에 막히지 않고 먼저 흘려보낸다.
-                    // 느린 항목끼리만 현재 항목의 interval 창을 기다린다.
-                    var delaySeconds = GetDelayBeforeNextSeconds();
+                    // 빠른 항목은 입력 시 즉시 Exit 되므로, 큐 안에는 느린 항목만 남는다.
+                    var delaySeconds = GetCurrentFlowIntervalSeconds();
                     if (delaySeconds > 0f)
                         await UniTask.Delay(TimeSpan.FromSeconds(delaySeconds), cancellationToken: token);
                     else
@@ -276,7 +293,7 @@ namespace Node68.CustomNodes
                         return;
                     }
 
-                    DequeueNextByPriority();
+                    DequeueOne();
                 }
             }
             catch (OperationCanceledException)
@@ -297,18 +314,6 @@ namespace Node68.CustomNodes
 
         private float GetCurrentFlowIntervalSeconds() => _current?.FlowInterval ?? GetFlowIntervalSeconds();
 
-        private float GetDelayBeforeNextSeconds()
-        {
-            if (_current == null || _queue.Count == 0)
-                return GetCurrentFlowIntervalSeconds();
-
-            var fastIndex = FindFirstFastQueueIndex();
-            if (fastIndex >= 0)
-                return Mathf.Max(0f, _queue[fastIndex].FlowInterval);
-
-            return GetCurrentFlowIntervalSeconds();
-        }
-
         private void DequeueOne()
         {
             if (_queue.Count == 0)
@@ -319,38 +324,6 @@ namespace Node68.CustomNodes
 
             RefreshDisplay();
             InvokeFlow(nameof(Exit));
-        }
-
-        private void DequeueNextByPriority()
-        {
-            var index = FindFirstFastQueueIndex();
-            if (index < 0)
-                index = 0;
-
-            DequeueAt(index);
-        }
-
-        private void DequeueAt(int index)
-        {
-            if (index < 0 || index >= _queue.Count)
-                return;
-
-            _current = _queue[index];
-            _queue.RemoveAt(index);
-
-            RefreshDisplay();
-            InvokeFlow(nameof(Exit));
-        }
-
-        private int FindFirstFastQueueIndex()
-        {
-            for (var i = 0; i < _queue.Count; i++)
-            {
-                if (IsFastQueueItem(_queue[i]))
-                    return i;
-            }
-
-            return -1;
         }
 
         private bool IsFastQueueItem(QueueItem item) =>
