@@ -50,6 +50,12 @@ namespace Node68.CustomNodes
         public float QueueFlowInterval;
 
         [DataInput]
+        [Label("빠른 큐 기준 (단위: 초)")]
+        [Description("이 값 이하의 큐 항목은 긴 대기열에 막히지 않고 먼저 처리합니다.")]
+        [FloatSlider(0f, 60f)]
+        public float FastQueueIntervalThreshold = 1f;
+
+        [DataInput]
         [Label("Info")]
         [Markdown(primary: true)]
         public string Info =
@@ -252,8 +258,8 @@ namespace Node68.CustomNodes
                     if (_current == null && _queue.Count == 0)
                         return;
 
-                    // False 항목은 앞뒤 True 대기시간에 막히지 않고 즉시 흘려보낸다.
-                    // True 항목끼리 연속될 때만 현재 항목의 interval 창을 기다린다.
+                    // 빠른 항목은 앞의 느린 대기열에 막히지 않고 먼저 흘려보낸다.
+                    // 느린 항목끼리만 현재 항목의 interval 창을 기다린다.
                     var delaySeconds = GetDelayBeforeNextSeconds();
                     if (delaySeconds > 0f)
                         await UniTask.Delay(TimeSpan.FromSeconds(delaySeconds), cancellationToken: token);
@@ -270,7 +276,7 @@ namespace Node68.CustomNodes
                         return;
                     }
 
-                    DequeueOne();
+                    DequeueNextByPriority();
                 }
             }
             catch (OperationCanceledException)
@@ -296,9 +302,11 @@ namespace Node68.CustomNodes
             if (_current == null || _queue.Count == 0)
                 return GetCurrentFlowIntervalSeconds();
 
-            var currentInterval = Mathf.Max(0f, _current.FlowInterval);
-            var nextInterval = Mathf.Max(0f, _queue[0].FlowInterval);
-            return currentInterval > 0f && nextInterval > 0f ? currentInterval : 0f;
+            var fastIndex = FindFirstFastQueueIndex();
+            if (fastIndex >= 0)
+                return Mathf.Max(0f, _queue[fastIndex].FlowInterval);
+
+            return GetCurrentFlowIntervalSeconds();
         }
 
         private void DequeueOne()
@@ -312,6 +320,41 @@ namespace Node68.CustomNodes
             RefreshDisplay();
             InvokeFlow(nameof(Exit));
         }
+
+        private void DequeueNextByPriority()
+        {
+            var index = FindFirstFastQueueIndex();
+            if (index < 0)
+                index = 0;
+
+            DequeueAt(index);
+        }
+
+        private void DequeueAt(int index)
+        {
+            if (index < 0 || index >= _queue.Count)
+                return;
+
+            _current = _queue[index];
+            _queue.RemoveAt(index);
+
+            RefreshDisplay();
+            InvokeFlow(nameof(Exit));
+        }
+
+        private int FindFirstFastQueueIndex()
+        {
+            for (var i = 0; i < _queue.Count; i++)
+            {
+                if (IsFastQueueItem(_queue[i]))
+                    return i;
+            }
+
+            return -1;
+        }
+
+        private bool IsFastQueueItem(QueueItem item) =>
+            Mathf.Max(0f, item.FlowInterval) <= Mathf.Max(0f, FastQueueIntervalThreshold);
 
         private static string FormatQueueValue(QueueItem item) =>
             $"{item.Amount} / {FormatDisplayText(item.NickName)} / {FormatDisplayText(item.Message)}";
