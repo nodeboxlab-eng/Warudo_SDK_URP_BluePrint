@@ -29,12 +29,10 @@ namespace Node68.CustomNodes
 
         [DataInput]
         [Label("Cases")]
-        [Description("큐 간격을 따로 지정할 후원량 목록입니다.")]
         public int[] Cases = { 80, 100, 75, 111 };
 
         [DataInput]
         [Label("기본 출력")]
-        [Description("슬롯에 없는 후원량일 때 출력할 큐 간격입니다.")]
         [FloatSlider(0f, 60f)]
         public float DefaultOutput = 1f;
 
@@ -84,12 +82,10 @@ namespace Node68.CustomNodes
 
         [DataOutput]
         [Label("출력")]
-        [Description("슬롯에 있는 후원량이면 해당 초, 없으면 기본 출력을 보냅니다.")]
         public float Output() => TryFindInterval(Count, out var seconds) ? seconds : DefaultOutput;
 
         [DataOutput]
         [Label("Integer[]")]
-        [Description("Cases 목록을 Integer 배열로 내보냅니다.")]
         public int[] CasesOutput() => GetNormalizedCases().ToArray();
 
         private int ComputeDisplayRevision()
@@ -159,14 +155,7 @@ namespace Node68.CustomNodes
                     new DataInputProperties
                     {
                         label = $"{amount} 큐 간격",
-                        description = $"{amount} 후원량일 때 Donation Queue Node68에 보낼 큐 간격입니다.",
                         order = 2000f + amount,
-                        typeProperties = new FloatDataInputTypeProperties
-                        {
-                            min = 0f,
-                            max = 60f,
-                            step = 0.1f,
-                        },
                     }
                 );
                 changed = true;
