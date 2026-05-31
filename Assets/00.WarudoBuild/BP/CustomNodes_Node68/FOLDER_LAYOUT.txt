@@ -1,0 +1,44 @@
+CustomNodes_Node68 — 폴더 역할 (개발/쉐어 확장용)
+================================================
+
+[모드 루트]
+  *.cs                  Warudo 노드·플러그인 본체 (모든 노드·에셋·헬퍼는 반드시 이 루트에 평면 배치)
+                        ※ UMod 빌드는 Assembly-CSharp.csproj 의 <Compile> 항목을 그대로 읽어
+                          컴파일 소스 목록을 만듭니다. 파일을 외부(Git·파일 시스템·IDE)에서
+                          이동/추가하면 .csproj 가 자동 갱신되지 않아 CS0246 빌드 실패가 납니다.
+                        ※ 빌드 메뉴(「Warudo > Build Mod (Node68: 개발·쉐어 선택)…」)는 빌드 직전
+                          UnityEditor.SyncVS.SyncSolution() 으로 .csproj 를 강제 동기화합니다
+                          (Editor/Node68ModBuildFlavorMenu.cs · Node68CsprojSync).
+                        ※ 임의 하위 폴더(예: Nodes/, Assets/)에 두면 동기화돼도 csproj 가
+                          그 .cs 를 포함하지 않을 수 있음 — 안정성을 위해 루트 평면을 권장합니다.
+                        ※ 참고: Node68_DevKit 도 같은 평면 구조.
+  Node68CustomNodesPlugin.cs   ← [PluginType] 진입점
+  CharacterBoneAttachedTextAsset.cs
+  *Node68.cs / *Node.cs        ← 노드 13종 (1파일 1노드 권장)
+  Node68CoreEnums.cs           ← 공용 enum 모음
+  Node68TypewriterText68.cs
+  Node68AnimateOverlaySamples68.cs
+  Node68TextDisplayFontLoadDiagnostics.cs
+  MOD_ROLE.txt
+
+[Build/]
+  쉐어·개발 flavor 는 플러그인 전체에 하나.
+  - Node68FlavorEmbedded.cs   ← 빌드 메뉴가 덮어씀 (ShareBuild true/false)
+  - Node68BuildRuntime.cs      ← IsShareBuild()
+  - Node68ShareNodeTypeTitles.cs ← 쉐어 그래프 노드 이름 " Shr" 및 예전 Title "[shr]" 접미사 정규화(strip)
+  - Node68NodeCategories.cs ← 개발/쉐어 [NodeType] Category 문자열 Toolkit vs Share
+
+
+[ShareBaked/]
+  (선택) 쉐어에서 특정 노드만 C# 리터럴 굳힘이 필요할 때 `{기능}ShareBakedData.cs` 추가.
+  Bone Group Scale / Character Pivot Offset 등 현재 툴킷 노드는 쉐어에서도 그래프 직렬화 값만 사용 — 폴더는 비어 있어도 됨.
+  네임스페이스는 Node68.CustomNodes 로 통일.
+  런타임에 JSON/에셋 로드 없음 — 굳힘 파일만 쓸 때 전부 C# 리터럴.
+
+[Editor/]
+  Unity 전용 — Warudo 빌드 메뉴, flavor 파일 기록 등.
+
+[Resources/]
+  (선택) 사람이 보기용 참고 txt 등. 쉐어 판별은 Node68FlavorEmbedded 에 의존.
+
+빌드: Warudo → Build Mod (Node68: 개발·쉐어 선택)…

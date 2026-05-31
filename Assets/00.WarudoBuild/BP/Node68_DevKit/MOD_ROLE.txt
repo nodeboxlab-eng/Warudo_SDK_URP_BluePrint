@@ -1,0 +1,311 @@
+================================================================================
+모드 역할 (고정 ID) — 폴더 이름은 바뀌어도 됨, 아래 ID만 유지하면 됨
+================================================================================
+
+고정 ID     : Node68_DevKit
+한글        : Node68 개발 보조(DevKit) — 블루프린트 내보내기 에셋·블렌드쉐이프 뷰어 등
+역할        : 배포용 CustomNodes_Node68 패키지와 분리해 두고, 개발·쉐어 빌드 시
+              Blueprint Exporter 에셋과 BlendShape Viewer 등 보조 기능만 담는 선택적 uMod 루트.
+              DevKit 노드는 쉐어 빌드에서도 인스펙터·포트 숨김 없이 전부 사용(프로젝트 룰).
+              그래프 노드 표시 이름에 ` Shr` 접미사도 붙이지 않음.
+
+Warudo 플러그인 ID : com.node68.devkit.warudo
+플러그인 클래스   : Node68DevKitPlugin
+
+노드 ID (블루프린트 호환):
+  • BlendShape Viewer Node68
+      e8f7a6b5-c4d3-41e9-8acb-9d716f2e5840
+  • Character Material Shader Probe Node68
+      91c3d2fd-5846-4735-9137-82d4edb6c3a9
+  • Toggle All Character Meshes Node68
+      b2e6f9c1-3a7d-4e5b-8a2c-7f1e9d3b4c50
+  • Extract Material Texture Node68
+      c4a8e2f1-9b3d-4e7c-a1f6-8d2e5b0c3a71
+        (상세 룰: 아래 「Extract Material Texture」 절, Cursor: .cursor/rules/node68-extract-material-texture.mdc)
+  • Material Hue Shift Node68
+      c5e0e3f4-6a7d-4c8e-1f2a-3b4c5d6e7f8a
+
+에셋 ID:
+  • Blueprint Exporter
+      a1b2c3d4-5678-9abc-def0-110e5c3b0001
+  • Light Setting (캐릭터)
+      c4e8f1a2-6b3d-4f9e-a1c7-2d5e8b0f3a61
+  • Light Setting (프롭)
+      d5f9a2b3-7c4e-5a0f-b2d8-3e6f9c1a4b72
+  • Light Setting (파티클)
+      e6a0b3c4-5d6e-7f8a-9b0c-1d2e3f4a5b83
+      CPU 머티리얼 방식. Dim만 쓸 때는 Volume 우선·Light Control 전역·매프레임 끌 것.
+  • Node Poiyomi Volume (Base Color Dim 전역, GPU)
+      f7b1c2d3-4e5f-6a7b-8c9d-0e1f2a3b4c5d
+  • Material Hue Shift (캐릭터)
+      a3f8c1d2-4e5b-4a6c-9d0e-1f2a3b4c5d6e
+  • Material Hue Shift (프롭)
+      b4a9d2e3-5f6c-4b7d-0e1f-2a3b4c5d6e7f
+      Poiyomi `_MainHueShift*` + `COLOR_GRADING_HDR` 자동 활성화.
+      ★ 상세: 아래 「Node Poiyomi Volume」 절 (DevKit v1.1.0~)
+
+(블루프린트 패널 Category: ⚙️Node68 DevKit — 개발/쉐어 빌드 동문자열. 포트·필드 숨김 없음 —
+ warudo-bp-folder 의 Node68_DevKit 절 참고.)
+
+================================================================================
+Node Poiyomi Volume — Base Color Dim 전역 (GPU) ★중요·검증됨
+================================================================================
+DevKit 플러그인 버전: 1.1.0 (Node68DevKitPlugin.cs)
+
+--- 목적 ---
+  Poiyomi 베이스 색·텍스처를 Potatoon Volume처럼 **전역(GPU)** 으로 어둡게(Base Color Dim).
+  Bloom(블룸·후처리)이 아님. `_Color` CPU 쓰기 대신 셰이더 `baseColor`에 전역 float 곱.
+
+--- 두 Unity 프로젝트 역할 (반드시 구분) ---
+
+  [Warudo_SDK_URP_BluePrint]  … DevKit·블루프린트·uMod 빌드
+    • C# 전체: Volume 에셋, Bridge, Plugin, Editor Injector
+    • uMod Export → Warudo에 Node68_DevKit 설치
+    • 셰이더 패치: 메뉴 또는 Patch All (아래)
+    • hlsl **원본** 경로:
+      Assets/00.WarudoBuild/BP/Node68_DevKit/Shaders/Node68PoiyomiGlobalVolume.hlsl
+
+  [Warudo_SDK_URP]  … 프롭·파티클 쉐어/Export 전용 (BP 폴더 없음)
+    • DevKit C# **없음** — hlsl **한 파일만** 동일 경로에 둠 (include 깨짐 방지)
+    • Optimized Poiyomi Pro URP 셰이더 **일괄 패치** (~49개, Export 대상)
+    • Unity Scene만 재생 시 Dim 안 보임 = 정상 (Warudo DevKit이 전역값 넣음)
+    • hlsl 수정 시 BluePrint 원본과 **내용 동기화** 필수
+
+--- 코드 위치 (BluePrint · UMod) ---
+
+  에셋     Node68PoiyomiGlobalVolumeAsset.cs
+           Id f7b1c2d3-4e5f-6a7b-8c9d-0e1f2a3b4c5d
+           Title 「Node Poiyomi Volume_Node68」
+           using Warudo.Core.Scenes 필수 (Asset 기본 클래스)
+
+  Bridge   Node68PoiyomiGlobalVolumeBridge.cs
+           Shader.SetGlobalFloat("_Node68GlobalBaseColorDimEnabled", …)
+           Shader.SetGlobalFloat("_Node68GlobalBaseColorDim", …)
+
+  HLSL     Shaders/Node68PoiyomiGlobalVolume.hlsl
+           매크로 NODE68_APPLY_GLOBAL_BASE_COLOR_DIM(poiFragData.baseColor)
+
+  Editor   Editor/Node68PoiyomiGlobalVolumeShaderInjector.cs
+  Plugin   Node68DevKitPlugin.cs → typeof(Node68PoiyomiGlobalVolumeAsset)
+
+--- Poiyomi 셰이더 패치 (양 프로젝트 **동일 코드**) ---
+
+  ① include (Lighting.hlsl 다음):
+     #include "Assets/00.WarudoBuild/BP/Node68_DevKit/Shaders/Node68PoiyomiGlobalVolume.hlsl"
+
+  ② baseColor 계산 후 (_Color 적용·Color Adjust 전):
+     NODE68_APPLY_GLOBAL_BASE_COLOR_DIM(poiFragData.baseColor);
+
+  Unity 메뉴 (BluePrint):
+    Node68 DevKit → Poiyomi Volume → Patch Default Shaders   (기본 2경로)
+    Node68 DevKit → Poiyomi Volume → Patch All Poiyomi Pro URP In Project
+    Node68 DevKit → Poiyomi Volume → Patch Selected Shader Files
+
+  패치 범위 (2025-05 기준):
+    BluePrint … 테스트용 2개 + Patch All로 확장 가능
+    URP       … Export용 Optimized Shader ~49개 (프롭·MANUKA·아바타 파츠 등)
+
+  새 Optimized Shader 만든 뒤 **반드시 패치** (미패치 = Volume 미적용).
+
+--- Warudo 사용 (체크리스트) ---
+
+  1) BluePrint에서 DevKit uMod v1.1.0+ 빌드 → Warudo StreamingAssets 등 설치
+  2) URP에서 프롭/파티클 uMod Export (패치된 Poiyomi 포함)
+  3) Warudo 재시작
+  4) 블루프린트에 에셋 「Node Poiyomi Volume_Node68」 추가
+     · Volume 활성 ON
+     · Base Color Dim 적용 ON
+     · Base Color Dim 0.5~0.65부터 시도 (1=원본)
+  5) PotaToon 캐릭터 → Potatoon Volume 유지 / Poiyomi → 이 Volume
+
+--- 적용 범위 ---
+
+  ✅ 패치된 Poiyomi Pro URP (Export 프롭, Throw Prop, Poiyomi 캐릭터)
+  ❌ PotaToon (Potatoon Volume 사용)
+  ❌ 패치 안 된 Poiyomi stock 셰이더
+
+--- Light Setting (이전 CPU 방식) 와 비교 ---
+
+  | | Light Setting | Node Poiyomi Volume |
+  |--|-------------------|---------------------|
+  | Dim 방식 | 머티리얼 `_Color` CPU SetColor | GPU 전역 float × baseColor |
+  | 대상 수집 | PropAsset·FindObjectsOfType 등 | 없음 (프롭 100개여도 SetGlobal 2회) |
+  | Throw Prop | FindObjectsOfType 스캔 | 패치 셰이더면 자동 |
+  | UI | 매 프레임 유지·인스턴스 머티리얼 등 | Volume 활성 + Dim 슬라이더만 |
+
+  Dim만 필요 → **Volume만** 사용.
+  Max Brightness·Emission 등 → Light Control 보조 (Volume과 Dim **중복 금지**).
+
+--- 수정·배포 시 주의 ---
+
+  • hlsl 변경 → BluePrint + URP hlsl **둘 다** 갱신
+  • DevKit C# 변경 → uMod 재빌드 + Warudo 재시작
+  • 셰이더만 URP에서 패치·Export → Warudo DevKit uMod는 별도 유지
+  • Node68PoiyomiGlobalVolumeAsset.cs 컴파일: using Warudo.Core.Scenes 필요
+
+================================================================================
+Extract Material Texture Node68 — 사용법 · 코드 로직 (검증됨)
+================================================================================
+Cursor 요약: .cursor/rules/node68-extract-material-texture.mdc
+
+--- 목적 ---
+  CharacterAsset 의 모든 SMR/MR 머티리얼 슬롯에서 **실제로 연결된** Texture2D·
+  RenderTexture 를 PNG 로 저장. VRChat·NiloToon·Poiyomi 등 isReadable=false 도 지원.
+
+--- 코드 위치 (UMod: 별도 .cs 추가 금지) ---
+  클래스   ExtractMaterialTextureNode68
+  파일     BlendShapeViewerNode68.cs  (라인 ~1231~)
+  플러그인 Node68DevKitPlugin.cs → typeof(ExtractMaterialTextureNode68)
+  상수     ExportRelativeBaseDir = "Node68TextureExport"
+
+================================================================================
+1. 사용법 (블루프린트)
+================================================================================
+
+[그래프 연결 예]
+  (캐릭터 스폰 노드) ──캐릭터──► [Extract Material Texture Node68]
+  (트리거/버튼)     ──Flow──► 「모든 텍스처보내기」 ──► 다음 노드…
+  (선택) Inspect Value ──결과/저장 폴더── 확인
+
+[필수 순서]
+  1) Warudo 에서 아바타·캐릭터 **스폰 완료** 후 실행 (머티리얼·렌더러가 채워진 뒤)
+  2) DataInput **캐릭터** = 해당 CharacterAsset
+  3) **하위 폴더** = 이름만 (예: MyAvatar). 비우면 yyyyMMdd_HHmmss 자동
+  4) **초록 Flow 「모든 텍스처보내기」** 실행
+     ※ 데이터 출력·Inspect 만 연결하면 RunExport 가 안 돌아 저장 0일 수 있음
+  5) DataOutput **결과**, **저장 폴더**, **저장 파일 수** 확인
+
+[DataInput]
+  캐릭터          CharacterAsset (필수)
+  하위 폴더        폴더 이름만. 경로 붙이면 마지막 세그먼트만 사용 + 경고 로그
+  파일 접두사      PNG 파일명 앞 접두사 (선택)
+  최대 변 길이     0=원본. >0 이면 긴 변을 이 픽셀 수로 축소 후 저장
+  저장 후 폴더 열기  저장 ≥1 일 때 file:// 로 탐색기 (기본 true)
+  머티리얼 슬롯    「이 슬롯만」 Flow 일 때만 (AutoComplete)
+  텍스처 프로퍼티  [Hidden] 단일 추출용
+
+[DataOutput]
+  저장 폴더        PC 전체 경로 (PersistentDataManager.GetFullPath)
+  저장 파일 수      성공한 PNG 개수
+  빈 슬롯 수        텍스처가 하나도 없던 머티리얼 슬롯 수
+  실패 수          PNG 변환·쓰기 실패 횟수
+  결과            요약 문자열 (고유 N장 · 저장 · 실패 + 안내)
+  경로 목록        저장된 파일 전체 경로 (줄바꿈)
+
+[FlowInput]
+  모든 텍스처보내기     ★ 기본 — 전 캐릭터, 고유 텍스처 1장씩
+  이 슬롯만            선택 슬롯의 연결 Texture 전부 (중복 텍스처는 exportedTextureIds 로 1회)
+  [Hidden] 전부보내기   구 그래프 호환 (= 모든 텍스처보내기)
+  [Hidden] NiloToon…   IsNiloToonMaterial 인 슬롯만
+  [Hidden] 선택 프로퍼티 1장  TryExportOne 단일
+
+[저장 경로]
+  상대  StreamingAssets/Node68TextureExport/{하위폴더}/
+  Steam …/Warudo/Warudo_Data/StreamingAssets/Node68TextureExport/{하위폴더}/
+  시작 시 _export_started.txt 기록 → 폴더 선생성 (PNG 0건이어도 **결과**에 경로 표시)
+
+[결과 메시지 예]
+  성공  모든 텍스처: 고유 42장 · 저장 38, 실패 4
+        → D:\…\StreamingAssets\Node68TextureExport\MyAvatar
+  실패  저장 0 + [확인] 체크리스트 + BuildZeroSaveDiagnostic()
+
+[주의]
+  • 프로젝트 Assets 전체·미연결 텍스처는보내지 않음 (머티리얼에 붙은 것만)
+  • Poiyomi 등: 빈 Texture 슬롯은 스킵 — 연결 0이면 저장 0이 정상일 수 있음
+  • 코드 수정 후 DevKit UMod 재빌드 + Warudo 재시작
+  • not readable 대량 실패 = 구버전 모드 또는 소스 직접 EncodeToPNG 회귀 버그
+
+================================================================================
+2. 코드 로직
+================================================================================
+
+--- 2.1 실행 흐름 (모든 텍스처보내기) ---
+
+  ExportAllTextures()  [FlowInput]
+    └─ RunExport(AllUniqueTexturesOnCharacter)
+         ├─ RebuildSlotsFromCharacter()     … SMR/MR → SlotEntry 목록
+         ├─ BuildExportRelativeDirectory() … Node68TextureExport/{sub}/
+         ├─ EnsureExportDirectory()        … _export_started.txt 쓰기
+         └─ ExportAllUniqueTexturesOnCharacter()
+              ├─ 슬롯마다 CollectNonNullTextureBindings()
+              ├─ Dictionary<texInstanceId, (slot,mat,prop,tex)> 로 고유화
+              └─ 각 고유 항목 TryExportTexture()
+                   ├─ CaptureTextureAsPng() → byte[]
+                   └─ pdm.WriteFileBytes(relPath, png)
+
+--- 2.2 ExportScope (RunExport switch) ---
+
+  AllUniqueTexturesOnCharacter  … ExportAllUniqueTexturesOnCharacter (기본)
+  AllAssignedOnSlot             … ExportAssignedTexturesOnSlot (슬롯 1개)
+  AllAssignedNiloToonOnCharacter … NiloToon 슬롯만 ExportAssignedTexturesOnSlot
+  SelectedProperty              … TryExportOne (Hidden, 단일 prop)
+
+--- 2.3 슬롯 인덱싱 RebuildSlotsFromCharacter ---
+
+  Character.SkinnedMeshRenderers  (kind=SMR)
+  Character.MeshRenderers         (kind=MR)
+    각 Renderer.sharedMaterials[i] → SlotEntry:
+      ValueKey   "{kind}\u241F{rendererKey}\u241F{slotIndex}\u241F{matInstanceId}"
+      Renderer, Slot, SharedMaterialRef
+      TextureProps = BuildTextureProps(shader)  // 쉐이더의 Texture 계열 프로퍼티명
+  캐시: _cachedCharacter + ComputeLayoutStamp() 동일 시 재스캔 생략
+
+--- 2.4 머티리얼·텍스처 해석 ---
+
+  ResolveLiveMaterial(slot)
+    1) renderer.sharedMaterials[slot.Slot]
+    2) 없으면 renderer.materials[slot.Slot]  (인스턴스)
+    3) fallback SharedMaterialRef
+
+  CollectNonNullTextureBindings(slot, mat)  → List<TextureBinding>
+    TryAdd(prop, tex) 조건: IsExportableTexture(tex)  // Texture2D | RenderTexture, w/h≥1
+    수집 순서:
+      · NiloToon 이면 NiloToonPriorityTexturePropertyNames 우선 (_BaseMap 등)
+      · mat.GetTexturePropertyNames() + GetTextureDirect
+      · slot.TextureProps 키
+      · mat.mainTexture
+      · AppendTexturesFromMaterialPropertyBlock  (항상 MPB)
+      · AppendTexturesFromInstanceMaterialIfDifferent (shared≠instance 일 때)
+
+  GetTextureDirect(mat, prop)  … mat.GetTexture / PropertyToID 폴백
+
+--- 2.5 고유화·파일명·저장 ---
+
+  ExportAllUniqueTexturesOnCharacter
+    전 슬롯 bindings 합친 뒤 tex.GetInstanceID() 당 1엔트리만 export
+    _lastUniqueTextureCount = unique.Count
+
+  TryExportTexture
+    exportedTextureIds.Add(texId) 실패 시 스킵 (슬롯 모드에서 동일 텍스처 재시도 방지)
+    파일명  {prefix_}{mat}__{prop}__{tex}__{SMR_key_s0}  + SanitizeFileToken
+    중복   MakeUniqueFileName → _2, _3 …
+
+  TryExportOne → TryResolveTexture → TryExportTexture (단일 prop)
+
+--- 2.6 PNG 캡처 CaptureTextureAsPng (핵심: 소스 직접 읽기 금지) ---
+
+  if Texture2D && isReadable
+    EncodeReadableTexture2D  (MaxLongEdge 시 Graphics.ConvertTexture 후 EncodeToPNG)
+  else
+    RenderTexture.GetTemporary(w,h, ARGB32, sRGB)
+    Graphics.Blit(src, rt)
+    EncodeRenderTextureToPng(rt):
+      1) RenderTexture.active=rt → new Texture2D → ReadPixels → EncodeToPNG
+      2) 실패 시 AsyncGPUReadback → LoadRawTextureData → EncodeToPNG
+
+  ※ src(VRChat 텍스처)에 EncodeToPNG/GetPixels 호출 금지 → not readable 대량 실패
+
+--- 2.7 보조 ---
+
+  IsNiloToonMaterial(mat)  … shader.name 에 NiloToon / SimpleURPToonLit / Nilo+Toon 등
+  BuildZeroSaveDiagnostic()  … 슬롯 수, Nilo 슬롯, _BaseMap 유무, 쉐이더 샘플
+  NoteSkip(msg)  … _lastFailureHint (마지막 실패 요약)
+  TryOpenExportFolder  … Application.OpenURL(file:///…)
+
+--- 2.8 UMod 제약 (수정 시 반드시 지킬 것) ---
+
+  • System.IO.File / Path / Directory 사용 금지 → PersistentDataManager 만
+  • ExtractMaterialTextureNode68 를 새 .cs 로 분리하지 말 것 (csproj 동기화)
+  • 로그 태그 [TextureExtract68]
+
+================================================================================

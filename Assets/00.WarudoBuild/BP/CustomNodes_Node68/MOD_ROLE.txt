@@ -1,0 +1,24 @@
+================================================================================
+모드 역할 (고정 ID) — 폴더 이름은 바뀌어도 됨, 아래 ID만 유지하면 됨
+================================================================================
+
+고정 ID     : Node68_CustomNodes (예: CustomNodes_Node68)
+한글        : Node68 사용자 정의 블루프린트 노드 모음
+역할        : 새 노드 클래스는 같은 어셈블리에서 Node68.CustomNodes 네임스페이스 또는
+              Node68CustomNodesPlugin 의 NodeTypes 배열에 등록.
+
+Warudo 플러그인 ID : com.node68.custom-nodes.warudo (단일 패키지)
+플러그인 클래스   : Node68CustomNodesPlugin
+
+uMod 빌드 시: 이 폴더를 mod 루트로 지정 → 하나의 Node68 패키지에 포함
+(과거 분리 패키지: CharacterBoneBatch / HumanoidBoneScaleBatch 플러그인은 통합 종료.)
+
+노드 ID (블루프린트 호환) — 패널 표시 제목 (`warudo-bp-folder` Title 규칙):
+  • Character Pivot Offset Node68
+      72c4eb91-53f9-4312-b8a8-1194f2c6d881
+  • Bone Group Scale Node68
+      a1b2c3d4-e5f6-4789-a012-3456789abcde
+  • BlendShape Viewer Node68 → Node68_DevKit 모듈(MOD_ROLE)로 이동
+      e8f7a6b5-c4d3-41e9-8acb-9d716f2e5840
+
+================================================================================

@@ -1,0 +1,37 @@
+# Unity generated folders
+/Library/
+/Temp/
+/Obj/
+/obj/
+/Build/
+/Builds/
+/Logs/
+/UserSettings/
+
+# Unity generated files
+*.csproj
+*.sln
+*.user
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# IDE/editor
+/.vs/
+/.vscode/
+/.idea/
+/.cursor/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Crash and temporary artifacts
+/MemoryCaptures/
+/Recordings/
+/Temp_PluginInspect/
+nul
