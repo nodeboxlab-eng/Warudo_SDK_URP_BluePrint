@@ -33,7 +33,6 @@ namespace Node68.CustomNodes
 
         [DataInput]
         [Label("기본 출력")]
-        [FloatSlider(0f, 60f)]
         public float DefaultOutput = 1f;
 
         [DataInput]
