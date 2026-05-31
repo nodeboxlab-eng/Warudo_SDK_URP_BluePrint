@@ -1,5 +1,4 @@
 using System;
-using System.Globalization;
 using Warudo.Core.Attributes;
 using Warudo.Core.Graphs;
 using Warudo.Core.Serializations;
@@ -8,7 +7,6 @@ namespace Node68.CustomNodes
 {
     /// <summary>
     /// 후원량별 큐 간격을 한 노드에서 관리합니다.
-    /// 형식: 80=3, 100=6, 75=8.5 처럼 줄바꿈/쉼표/세미콜론으로 구분.
     /// </summary>
     [NodeType(
         Id = "2ac3ed76-8ef2-46d3-9f33-31b1af3ecb68",
@@ -27,13 +25,80 @@ namespace Node68.CustomNodes
         public int Count;
 
         [DataInput]
-        [Label("시간표")]
-        [Description("형식: 80=3, 100=6, 75=8.5 처럼 줄바꿈/쉼표/세미콜론으로 구분합니다.")]
-        public string IntervalTable = "80=3\n100=6\n75=8.5\n111=1";
+        [Label("1번 후원량")]
+        public int Amount1 = 80;
+
+        [DataInput]
+        [Label("1번 큐 간격")]
+        [FloatSlider(0f, 60f)]
+        public float Interval1 = 3f;
+
+        [DataInput]
+        [Label("2번 후원량")]
+        public int Amount2 = 100;
+
+        [DataInput]
+        [Label("2번 큐 간격")]
+        [FloatSlider(0f, 60f)]
+        public float Interval2 = 6f;
+
+        [DataInput]
+        [Label("3번 후원량")]
+        public int Amount3 = 75;
+
+        [DataInput]
+        [Label("3번 큐 간격")]
+        [FloatSlider(0f, 60f)]
+        public float Interval3 = 8.5f;
+
+        [DataInput]
+        [Label("4번 후원량")]
+        public int Amount4 = 111;
+
+        [DataInput]
+        [Label("4번 큐 간격")]
+        [FloatSlider(0f, 60f)]
+        public float Interval4 = 1f;
+
+        [DataInput]
+        [Label("5번 후원량")]
+        public int Amount5;
+
+        [DataInput]
+        [Label("5번 큐 간격")]
+        [FloatSlider(0f, 60f)]
+        public float Interval5 = 1f;
+
+        [DataInput]
+        [Label("6번 후원량")]
+        public int Amount6;
+
+        [DataInput]
+        [Label("6번 큐 간격")]
+        [FloatSlider(0f, 60f)]
+        public float Interval6 = 1f;
+
+        [DataInput]
+        [Label("7번 후원량")]
+        public int Amount7;
+
+        [DataInput]
+        [Label("7번 큐 간격")]
+        [FloatSlider(0f, 60f)]
+        public float Interval7 = 1f;
+
+        [DataInput]
+        [Label("8번 후원량")]
+        public int Amount8;
+
+        [DataInput]
+        [Label("8번 큐 간격")]
+        [FloatSlider(0f, 60f)]
+        public float Interval8 = 1f;
 
         [DataInput]
         [Label("기본 출력")]
-        [Description("시간표에 없는 후원량일 때 출력할 큐 간격입니다.")]
+        [Description("슬롯에 없는 후원량일 때 출력할 큐 간격입니다.")]
         [FloatSlider(0f, 60f)]
         public float DefaultOutput = 1f;
 
@@ -78,7 +143,7 @@ namespace Node68.CustomNodes
 
         [DataOutput]
         [Label("출력")]
-        [Description("시간표에 있는 후원량이면 해당 초, 없으면 기본 출력을 보냅니다.")]
+        [Description("슬롯에 있는 후원량이면 해당 초, 없으면 기본 출력을 보냅니다.")]
         public float Output() => TryFindInterval(Count, out var seconds) ? seconds : DefaultOutput;
 
         private int ComputeDisplayRevision()
@@ -87,7 +152,22 @@ namespace Node68.CustomNodes
             {
                 var hash = Count;
                 hash = (hash * 31) + MathfRoundToInt(DefaultOutput * 100f);
-                hash = (hash * 31) + (IntervalTable?.GetHashCode() ?? 0);
+                hash = (hash * 31) + Amount1;
+                hash = (hash * 31) + MathfRoundToInt(Interval1 * 100f);
+                hash = (hash * 31) + Amount2;
+                hash = (hash * 31) + MathfRoundToInt(Interval2 * 100f);
+                hash = (hash * 31) + Amount3;
+                hash = (hash * 31) + MathfRoundToInt(Interval3 * 100f);
+                hash = (hash * 31) + Amount4;
+                hash = (hash * 31) + MathfRoundToInt(Interval4 * 100f);
+                hash = (hash * 31) + Amount5;
+                hash = (hash * 31) + MathfRoundToInt(Interval5 * 100f);
+                hash = (hash * 31) + Amount6;
+                hash = (hash * 31) + MathfRoundToInt(Interval6 * 100f);
+                hash = (hash * 31) + Amount7;
+                hash = (hash * 31) + MathfRoundToInt(Interval7 * 100f);
+                hash = (hash * 31) + Amount8;
+                hash = (hash * 31) + MathfRoundToInt(Interval8 * 100f);
                 return hash;
             }
         }
@@ -96,54 +176,34 @@ namespace Node68.CustomNodes
         {
             seconds = 0f;
 
-            if (string.IsNullOrWhiteSpace(IntervalTable))
+            return TryMatch(count, Amount1, Interval1, out seconds)
+                || TryMatch(count, Amount2, Interval2, out seconds)
+                || TryMatch(count, Amount3, Interval3, out seconds)
+                || TryMatch(count, Amount4, Interval4, out seconds)
+                || TryMatch(count, Amount5, Interval5, out seconds)
+                || TryMatch(count, Amount6, Interval6, out seconds)
+                || TryMatch(count, Amount7, Interval7, out seconds)
+                || TryMatch(count, Amount8, Interval8, out seconds);
+        }
+
+        private static bool TryMatch(int count, int amount, float interval, out float seconds)
+        {
+            seconds = 0f;
+            if (amount <= 0 || count != amount)
                 return false;
 
-            var entries = IntervalTable.Split(
-                new[] { '\r', '\n', ',', ';' },
-                StringSplitOptions.RemoveEmptyEntries
-            );
-
-            foreach (var rawEntry in entries)
-            {
-                var entry = rawEntry.Trim();
-                if (entry.Length == 0 || entry.StartsWith("#", StringComparison.Ordinal))
-                    continue;
-
-                var separatorIndex = entry.IndexOf('=');
-                if (separatorIndex < 0)
-                    separatorIndex = entry.IndexOf(':');
-
-                if (separatorIndex <= 0 || separatorIndex >= entry.Length - 1)
-                    continue;
-
-                var keyText = entry.Substring(0, separatorIndex).Trim();
-                var valueText = entry.Substring(separatorIndex + 1).Trim();
-
-                if (!int.TryParse(keyText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var key))
-                    continue;
-
-                if (key != count)
-                    continue;
-
-                if (!float.TryParse(valueText, NumberStyles.Float, CultureInfo.InvariantCulture, out seconds))
-                    continue;
-
-                seconds = Math.Max(0f, seconds);
-                return true;
-            }
-
-            return false;
+            seconds = Math.Max(0f, interval);
+            return true;
         }
 
         private void RefreshDisplay()
         {
             var matched = TryFindInterval(Count, out var seconds);
             var output = matched ? seconds : DefaultOutput;
-            var status = matched ? "시간표 일치" : "기본 출력";
+            var status = matched ? "슬롯 일치" : "기본 출력";
 
             Info =
-                $"### 큐 간격 시간표 <br> 비교 개수: {Count} <br> 상태: {status} <br> 출력: {output:0.##}초";
+                $"### 큐 간격 슬롯 <br> 비교 개수: {Count} <br> 상태: {status} <br> 출력: {output:0.##}초";
 
             SetDataInput(nameof(Info), Info, broadcast: true);
             _displayRevision = ComputeDisplayRevision();
